@@ -54,6 +54,13 @@ jobs:
       - name: Synchroniser l'application
         run: npx cap sync android
 
+      - name: Vérifier les plugins natifs (Filesystem et Share)
+        run: |
+          P=android/app/src/main/assets/capacitor.plugins.json
+          cat "$P"
+          grep -q '@capacitor/filesystem' "$P" || { echo "ERREUR : le plugin Filesystem n'est pas dans l'APK"; exit 1; }
+          grep -q '@capacitor/share' "$P" || { echo "ERREUR : le plugin Share n'est pas dans l'APK"; exit 1; }
+
       - name: Utiliser la clé de signature fixe
         run: |
           mkdir -p ~/.android
