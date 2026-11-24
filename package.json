@@ -1,0 +1,42 @@
+{
+  "name": "locores",
+  "version": "1.0.0",
+  "description": "LoCoRES - Logiciel de Compilation des Résultats des Évaluations Scolaires",
+  "author": "LoCoRES",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist:win": "electron-builder --win --publish never"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^6.2.0",
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^6.2.0",
+    "@capacitor/core": "^6.2.0",
+    "@capacitor/filesystem": "^6.0.2",
+    "@capacitor/share": "^6.0.3",
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.locores.app",
+    "productName": "LoCoRES",
+    "directories": { "output": "dist" },
+    "files": ["main.js", "index.html", "icon.png"],
+    "win": {
+      "target": ["nsis", "portable"],
+      "icon": "icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "artifactName": "LoCoRES-Installateur-${version}.exe"
+    },
+    "portable": {
+      "artifactName": "LoCoRES-Portable-${version}.exe"
+    }
+  }
+}

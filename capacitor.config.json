@@ -1,0 +1,8 @@
+{
+  "appId": "com.locores.app",
+  "appName": "LoCoRES",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false
+  }
+}
