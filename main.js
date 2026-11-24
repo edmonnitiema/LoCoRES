@@ -22,7 +22,7 @@ function createWindow() {
   });
   Menu.setApplicationMenu(null);
   win.maximize();
-  win.loadFile(path.join(__dirname, 'index.html'));
+  win.loadFile(path.join(__dirname, 'LoCoRES.html'));
 
   // Les liens externes s'ouvrent dans le navigateur ; les téléchargements
   // (PDF, Excel, sauvegarde) affichent la fenêtre « Enregistrer sous ».
