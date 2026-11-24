@@ -1,0 +1,123 @@
+name: Construire LoCoRES
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  android:
+    name: Android (APK)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Préparer les dossiers
+        run: |
+          ls -la
+          mkdir -p www assets
+          if [ -f LoCoRES.html ]; then
+            cp LoCoRES.html www/index.html
+          elif [ -f index.html ]; then
+            cp index.html www/index.html
+          else
+            echo "ERREUR : le fichier LoCoRES.html est absent du depot"
+            exit 1
+          fi
+          if [ -f icon.png ]; then cp icon.png assets/icon.png; fi
+
+      - name: Installer les dépendances
+        run: npm install
+
+      - name: Créer le projet Android
+        run: npx cap add android
+
+      - name: Icône de l'application (facultatif)
+        continue-on-error: true
+        run: |
+          npx capacitor-assets generate --android \
+            --iconBackgroundColor '#1d5c3e' \
+            --iconBackgroundColorDark '#1d5c3e'
+
+      - name: Synchroniser l'application
+        run: npx cap sync android
+
+      - name: Utiliser la clé de signature fixe
+        run: |
+          mkdir -p ~/.android
+          if [ -f debug.keystore ]; then
+            cp debug.keystore ~/.android/debug.keystore
+          else
+            echo "debug.keystore absent : signature automatique"
+          fi
+
+      - name: Autorisations de stockage Android
+        run: |
+          M=android/app/src/main/AndroidManifest.xml
+          P='<uses-permission android:name="android.permission.'
+          sed -i "/permission.INTERNET/a\\
+              ${P}WRITE_EXTERNAL_STORAGE\" android:maxSdkVersion=\"29\" />\\
+              ${P}READ_EXTERNAL_STORAGE\" android:maxSdkVersion=\"32\" />" $M
+          grep -n "uses-permission" $M
+
+      - name: Numéro de version
+        run: |
+          F=android/app/build.gradle
+          sed -i "s/versionCode 1/versionCode ${{ github.run_number }}/" $F
+          sed -i "s/versionName \"1.0\"/versionName \"1.0.${{ github.run_number }}\"/" $F
+
+      - name: Construire l'APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Renommer l'APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk LoCoRES.apk
+
+      - name: Publier dans Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v1.0.${{ github.run_number }}"
+          gh release create "$TAG" --target "${{ github.sha }}" \
+            --title "LoCoRES $TAG" --notes "Application LoCoRES" || true
+          gh release upload "$TAG" LoCoRES.apk --clobber
+
+  windows:
+    name: Windows (EXE)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Installer les dépendances
+        run: npm install
+
+      - name: Construire les programmes Windows
+        run: npm run dist:win
+
+      - name: Publier dans Releases
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v1.0.${{ github.run_number }}"
+          gh release create "$TAG" --target "${{ github.sha }}" \
+            --title "LoCoRES $TAG" --notes "Application LoCoRES" || true
+          gh release upload "$TAG" dist/*.exe --clobber
