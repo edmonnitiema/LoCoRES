@@ -113,11 +113,30 @@ jobs:
         with:
           node-version: 20
 
+      - name: Vérifier la présence de LoCoRES.html
+        shell: bash
+        run: |
+          ls -la
+          if [ ! -f LoCoRES.html ]; then
+            if [ -f index.html ]; then
+              cp index.html LoCoRES.html
+            else
+              echo "ERREUR : LoCoRES.html est absent du depot"
+              exit 1
+            fi
+          fi
+
       - name: Installer les dépendances
         run: npm install
 
       - name: Construire les programmes Windows
         run: npm run dist:win
+
+      - name: Vérifier que LoCoRES.html est dans l'application
+        shell: bash
+        run: |
+          npx --yes @electron/asar list dist/win-unpacked/resources/app.asar | tee asar.txt
+          grep -q 'LoCoRES.html' asar.txt || { echo "ERREUR : LoCoRES.html n'est pas dans l'EXE"; exit 1; }
 
       - name: Publier dans Releases
         shell: bash
