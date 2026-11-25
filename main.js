@@ -2,9 +2,8 @@ const { app, BrowserWindow, Menu, shell, ipcMain, dialog } = require('electron')
 const path = require('path');
 const fs = require('fs');
 
-if (!app.requestSingleInstanceLock()) {
-  app.quit();
-}
+// Évite les fenêtres blanches dues au processeur graphique (fréquent sur les anciens PC)
+app.disableHardwareAcceleration();
 
 // Enregistre un fichier dans Documents\<dossier>\ (le dossier est créé s'il n'existe pas)
 ipcMain.handle('pont:enregistrer', async (event, name, type, b64, dossier) => {
@@ -40,7 +39,34 @@ function createWindow() {
   });
   Menu.setApplicationMenu(null);
   win.maximize();
-  win.loadFile(path.join(__dirname, 'LoCoRES.html'));
+
+  // F12 ou Ctrl+Maj+I : ouvre la console pour diagnostiquer un problème
+  win.webContents.on('before-input-event', (e, input) => {
+    if (input.type === 'keyDown' &&
+        (input.key === 'F12' || (input.control && input.shift && input.key.toUpperCase() === 'I'))) {
+      win.webContents.toggleDevTools();
+    }
+  });
+
+  // Affiche la cause exacte au lieu d'une page blanche
+  win.webContents.on('did-fail-load', (e, code, desc, url) => {
+    dialog.showErrorBox('LoCoRES', 'Échec du chargement de la page.\n\nErreur : ' + code + ' ' + desc + '\n' + url);
+  });
+  win.webContents.on('render-process-gone', (e, details) => {
+    dialog.showErrorBox('LoCoRES', 'Le moteur d\u2019affichage s\u2019est arrêté : ' + details.reason);
+  });
+
+  const page = path.join(__dirname, 'LoCoRES.html');
+  if (!fs.existsSync(page)) {
+    let liste = '';
+    try { liste = fs.readdirSync(__dirname).join(', '); } catch (err) {}
+    dialog.showErrorBox('LoCoRES',
+      'Le fichier LoCoRES.html est absent de l\u2019application.\n\nDossier : ' + __dirname + '\nContenu : ' + liste);
+    return;
+  }
+  win.loadFile(page).catch((err) => {
+    dialog.showErrorBox('LoCoRES', 'Impossible d\u2019ouvrir LoCoRES.html : ' + ((err && err.message) || err));
+  });
 
   // Les liens externes (WhatsApp...) s'ouvrent dans le navigateur.
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -49,9 +75,13 @@ function createWindow() {
   });
 }
 
-app.whenReady().then(createWindow);
-app.on('second-instance', () => {
-  const w = BrowserWindow.getAllWindows()[0];
-  if (w) { if (w.isMinimized()) w.restore(); w.focus(); }
-});
-app.on('window-all-closed', () => app.quit());
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  app.whenReady().then(createWindow);
+  app.on('second-instance', () => {
+    const w = BrowserWindow.getAllWindows()[0];
+    if (w) { if (w.isMinimized()) w.restore(); w.focus(); }
+  });
+  app.on('window-all-closed', () => app.quit());
+}
