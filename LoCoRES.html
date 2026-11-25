@@ -333,7 +333,7 @@ function blockers(){
 /* ===== Interface ===== */
 let cur="home";M.ui.page="home";
 let curMod=null;
-const NAV=[["ident","IDENTIFICATION"],["compo","COMPOSITIONS"],["eb","EXAMENS BLANCS"],["save","SAUVEGARDE"],["restore","RESTAURATION"],["reset","RÉINITIALISATION"]];
+const NAV=[["ident","IDENTIFICATION"],["compo","COMPOSITIONS"],["eb","EXAMENS BLANCS"],["save","SAUVEGARDE"],["restore","RESTAURATION"],["fusion","FUSION DES DONNÉES"],["reset","RÉINITIALISATION"]];
 function toast(m){const t=$("toast");t.textContent=m;t.style.display="block";clearTimeout(toast.t);toast.t=setTimeout(()=>{t.style.display="none"},4200)}
 function modal(html){$("obox").innerHTML=html;$("ovl").classList.add("on")}
 function closeModal(){$("ovl").classList.remove("on");$("obox").innerHTML=""}
@@ -430,10 +430,10 @@ function doRenew(which){
 function show(p){
  const L0=licInfo();
  if(L0.bloque){cur=p;const v=$("view"),mw=$("modwrap"),t=$("top");mw.className="";mw.innerHTML="";curMod=null;t.className="";t.innerHTML="";v.style.display="";v.className="";v.innerHTML=lockHtml(L0);window.scrollTo(0,0);return}
- cur=p;if(["home","ident","save","restore","reset"].includes(p)){M.ui.page=p;save()}
+ cur=p;if(p!=="fusion"){FUS.ok=false;FUS.files=null}if(["home","ident","save","restore","reset"].includes(p)){M.ui.page=p;save()}
  const v=$("view"),mw=$("modwrap"),isMod=(p==="compo"||p==="eb");
  v.style.display=isMod?"none":"";mw.className=isMod?"on":"";
- if(!isMod){mw.innerHTML="";curMod=null;v.className="";v.innerHTML=licBanner()+({home:pgHome,ident:pgIdent,save:pgSave,restore:pgRestore,reset:pgReset}[p])()+(p==='home'?licHtml():'');window.scrollTo(0,0)}
+ if(!isMod){mw.innerHTML="";curMod=null;v.className="";v.innerHTML=licBanner()+({home:pgHome,ident:pgIdent,save:pgSave,restore:pgRestore,fusion:pgFusion,reset:pgReset}[p])()+(p==='home'?licHtml():'');window.scrollTo(0,0)}
  topbar()}
 function mount(which){
  const b64=(which==="compo"?$("srcLoco"):$("srcEB")).textContent.trim(),code=new TextDecoder("utf-8").decode(Uint8Array.from(atob(b64),c=>c.charCodeAt(0)));
@@ -449,7 +449,7 @@ function openMod(which){ensureDate();
 /* --- Accueil --- */
 function pgHome(){
  let k=0;const ttl="BIENVENUE DANS LoCoRES,".split(" ").map(w=>'<i class="wl">'+[...w].map(c=>'<i class="ch" style="--i:'+(k++)+'" aria-hidden="true">'+c+"</i>").join("")+"</i>").join(" ");
- const B=[["ident","IDENTIFICATION"],["compo","COMPOSITIONS"],["eb","EXAMENS BLANCS"],["save","SAUVEGARDE"],["restore","RESTAURATION"],["reset","RÉINITIALISATION"]];
+ const B=[["ident","IDENTIFICATION"],["compo","COMPOSITIONS"],["eb","EXAMENS BLANCS"],["save","SAUVEGARDE"],["restore","RESTAURATION"],["fusion","FUSION DES DONNÉES"],["reset","RÉINITIALISATION"]];
  return '<section class="home"><div style="text-align:center;margin:0 auto 6px;display:flex;justify-content:center">'+logoSvg(120,0)+'</div><h1><span class="sr" style="position:absolute;left:-9999px">BIENVENUE DANS LoCoRES, le Logiciel de Compilation des Résultats des Évaluations Scolaires.</span>'+ttl+'<span class="sub" style="--n:'+k+'">le Logiciel de Compilation des Résultats des Évaluations Scolaires.</span></h1>'
  +'<div class="menu">'+B.map(x=>'<button type="button" class="'+(x[0]==="reset"?"d":"")+'" onclick="LG.go(\''+x[0]+'\')">'+x[1]+"</button>").join("")+"</div>"
  +'<div class="credit"><div class="ct">Conception et réalisation</div><div class="nm">Edmon NITIEMA</div><div>Amateur informatique</div><div>WhatsApp : 78 21 42 50</div><div>Telegram : 70 08 98 57</div><div>Orange : 76 54 18 23</div></div></section>'}
@@ -530,6 +530,71 @@ function pgRestore(){
 function pgReset(){
  return '<div class="card"><h2>RÉINITIALISATION</h2><p>Deux niveaux de réinitialisation sont possibles. Une fenêtre d’avertissement vous demandera de confirmer.</p><div class="ctl"><button class="bt red" onclick="LG.resetAsk()">Réinitialiser l’application</button></div><p class="mu">Pensez à faire une sauvegarde avant.</p></div>'}
 
+
+/* ===== Fusion des données (protégée par mot de passe) ===== */
+var FUS={ok:false,asked:false,files:null,mode:"garder"};
+const FUS_PW="locores-fusion-pwd",FUS_TRY="locores-fusion-try",FUS_UNDO="locores_avant_fusion",FUS_DEF="123456";
+const h53=(s,seed)=>{let h1=0xdeadbeef^seed,h2=0x41c6ce57^seed;for(let i=0,c;i<s.length;i++){c=s.charCodeAt(i);h1=Math.imul(h1^c,2654435761);h2=Math.imul(h2^c,1597334677)}h1=Math.imul(h1^(h1>>>16),2246822507)^Math.imul(h2^(h2>>>13),3266489909);h2=Math.imul(h2^(h2>>>16),2246822507)^Math.imul(h1^(h1>>>13),3266489909);return 4294967296*(2097151&h2)+(h1>>>0)};
+const pwH=x=>{const t="LoCoRES|fusion|"+x;return h53(t,1).toString(16)+"-"+h53(t,2).toString(16)};
+const pwStored=()=>{try{const o=JSON.parse(localStorage.getItem(FUS_PW)||"null");return o&&o.h?o.h:null}catch(e){return null}};
+const pwIsDefault=()=>!pwStored();
+const pwCheck=x=>{const h=pwStored();return h?pwH(x)===h:x===FUS_DEF};
+function pgFusion(){
+ if(!FUS.ok){
+  return '<div class="card" style="max-width:460px;margin:0 auto"><h2>FUSION DES DONNÉES</h2><p>Cette page est protégée. Saisissez le mot de passe pour continuer.</p><form onsubmit="LG.fusLogin();return false"><label>Mot de passe<input id="fus-pw" type="password" autocomplete="off" autocapitalize="off" spellcheck="false"></label><div class="ctl" style="margin-top:8px"><button class="bt" type="submit">Accéder</button></div></form><p class="warn" id="fus-err" hidden></p></div>'}
+ const has=!!localStorage.getItem(FUS_UNDO);
+ return '<div class="card"><h2>FUSION DES DONNÉES</h2><p>Plusieurs personnes peuvent saisir sur des appareils différents. Réunissez ici leurs fichiers de sauvegarde : l’identification, les ZEP, les écoles, les disciplines et les résultats des <b>Compositions</b> et des <b>Examens blancs</b> sont fusionnés.</p><ul class="mu"><li>Choisissez un ou plusieurs fichiers de sauvegarde <b>LoCoRES</b> (.json). Les anciens fichiers LoCoRéCo et LoCoREB sont aussi acceptés.</li><li>Les cases vides sont complétées avec les données des fichiers ; rien n’est effacé.</li><li>Une sauvegarde de vos données actuelles est conservée pour pouvoir annuler la fusion.</li></ul><div class="ctl"><label class="bt" style="margin:0;display:inline-block">Choisir les fichiers à fusionner<input type="file" multiple accept=".json,application/json,text/plain,application/octet-stream" hidden onchange="LG.fusPick(this)"></label></div></div>'
+ +'<div class="card"><h3 style="margin-top:0">Options</h3><div class="ctl"><button class="bt sec" onclick="LG.pwdAsk()">Changer le mot de passe</button>'+(has?'<button class="bt sec" onclick="LG.fusUndoAsk()">Annuler la dernière fusion</button>':'')+'</div></div>'}
+const fAv=v=>v!==undefined&&v!==null&&String(v).trim()!=="";
+const fLeaves=v=>{if(v&&typeof v==="object")return Object.keys(v).reduce((a,k)=>a+fLeaves(v[k]),0);return fAv(v)?1:0};
+const fClone=v=>JSON.parse(JSON.stringify(v));
+function fMerge(t,f,canon,rep,path){
+ Object.keys(f||{}).forEach(k=>{
+  const fv=f[k];if(fv===undefined||fv===null)return;
+  let tk=k;if(canon){const n0=nk(k),ex=Object.keys(t).find(x=>nk(x)===n0);if(ex!==undefined)tk=ex}
+  const tv=t[tk],isO=x=>x&&typeof x==="object"&&!Array.isArray(x);
+  if(isO(fv)){
+   if(isO(tv))fMerge(tv,fv,canon,rep,path+" › "+k);
+   else if(tv===undefined||tv===null||tv===""||(Array.isArray(tv)&&!tv.length)){t[tk]=fClone(fv);rep.filled+=fLeaves(fv)}
+   else{rep.conf++;if(rep.confs.length<40)rep.confs.push(path+" › "+k);if(rep.mode==="fichier")t[tk]=fClone(fv)}
+  }else if(Array.isArray(fv)){
+   if(!fv.length)return;
+   if(tv===undefined||tv===null||tv===""||(Array.isArray(tv)&&!tv.length)){t[tk]=fClone(fv);rep.filled++}
+   else if(JSON.stringify(tv)!==JSON.stringify(fv)){rep.conf++;if(rep.confs.length<40)rep.confs.push(path+" › "+k);if(rep.mode==="fichier")t[tk]=fClone(fv)}
+  }else{
+   if(!fAv(tv)){t[tk]=fv;if(fAv(fv))rep.filled++}
+   else if(fAv(fv)&&String(tv)!==String(fv)){rep.conf++;if(rep.confs.length<40)rep.confs.push(path+" › "+k);if(rep.mode==="fichier")t[tk]=fv}
+  }})}
+function fMasterMerge(Mf){
+ const f=fix(fClone(Mf));
+ fill(M.id,f.id);
+ (f.zeps||[]).forEach(addZep);
+ (f.schools||[]).forEach(e=>{if(!e||!e.n)return;let s=schoolByName(e.n);if(!s){s={id:e.id||mkId(e.n),n:UPS(String(e.n).trim()),st:"",zep:"",eb:false};M.schools.push(s)}
+  if(!s.st&&e.st)s.st=e.st;if(!s.zep&&e.zep)s.zep=addZep(e.zep);if(e.eb)s.eb=true});
+ Object.keys(f.zr||{}).forEach(z=>{const zz=addZep(z);M.zr[zz]=M.zr[zz]||{};fill(M.zr[zz],f.zr[z]||{})});
+ ["CP","CE","CM"].forEach(g=>{M.discC[g]=union(M.discC[g],(f.discC||{})[g])});
+ M.discE=union(M.discE,f.discE)}
+function fusRun(files,mode,commit){
+ const snap=JSON.stringify(M),n0=M.schools.length,z0=M.zeps.length;
+ const rep={files:0,ecoles:0,zeps:0,filled:0,conf:0,confs:[],mode:mode};
+ let L=rd(K_LOCO),E=rd(K_EB);if(!L||typeof L!=="object")L={};if(!E||typeof E!=="object")E={};
+ L.ef=L.ef||{};L.rs=L.rs||{};E.ex=E.ex||{};
+ const mL=d=>{importLoco(d);fMerge(L.ef,d.ef||{},false,rep,"Compositions › effectifs");fMerge(L.rs,d.rs||{},false,rep,"Compositions › résultats")};
+ const mE=d=>{importEB(d);Object.keys(d.ex||{}).forEach(n=>{const o=d.ex[n];if(o&&o.d){const nd={};Object.keys(o.d).forEach(sn=>{const sc=schoolByName(sn);nd[sc?sc.n:sn]=o.d[sn]});o.d=nd}});fMerge(E.ex,d.ex||{},true,rep,"Examens blancs")};
+ try{
+  files.forEach(f=>{
+   const d=fClone(f.d);rep.files++;
+   if(f.kind==="loces"){fMasterMerge(d.master);if(d.loco&&typeof d.loco==="object")mL(d.loco);if(d.locoreb&&typeof d.locoreb==="object")mE(d.locoreb)}
+   else if(f.kind==="loco")mL(d);else mE(d)});
+  sortAll();rep.ecoles=M.schools.length-n0;rep.zeps=M.zeps.length-z0;
+  if(commit){save();wr(K_LOCO,L);wr(K_EB,E)}
+ }finally{if(!commit)M=fix(JSON.parse(snap))}
+ return rep}
+function fusKind(d){
+ if(d&&(d.format==="LoCoRES"||d.format==="LIGES"||d.format==="LoGES")&&d.master)return "loces";
+ if(d&&Array.isArray(d.ec)&&d.di)return "loco";
+ if(d&&Array.isArray(d.schools)&&d.ex)return "eb";
+ return ""}
 /* ===== Actions exposées ===== */
 const LG=window.LG={
  go(p){if(p==="compo"||p==="eb")return openMod(p);if(p!=="ident")M.ui.warn=null;show(p)},
@@ -587,6 +652,58 @@ const LG=window.LG={
   }catch(e){toast("La réinitialisation a échoué.")}}
 };
 LG.copyId=copyId;LG.renew=doRenew;
+Object.assign(LG,{
+ fusLogin(){
+  const inp=$("fus-pw"),err=$("fus-err");let T={n:0,u:0};try{T=JSON.parse(localStorage.getItem(FUS_TRY)||"")||T}catch(e){}
+  const bad=m=>{err.textContent=m;err.hidden=false;toast(m)};
+  if(T.u>Date.now())return bad("Trop d’essais incorrects. Réessayez dans "+Math.ceil((T.u-Date.now())/60000)+" minute(s).");
+  if(pwCheck(inp.value)){try{localStorage.removeItem(FUS_TRY)}catch(e){}FUS.ok=true;show("fusion");
+   if(pwIsDefault()&&!FUS.asked){FUS.asked=true;modal('<h3 style="margin-top:0">Mot de passe par défaut</h3><p>Vous utilisez le mot de passe par défaut. Pour protéger l’accès à la fusion des données, voulez-vous le changer maintenant ?</p><div class="ctl"><button class="bt" onclick="LG.pwdAsk()">Changer le mot de passe</button><button class="bt sec" onclick="LG.cancel()">Plus tard</button></div>')}
+   return}
+  T.n=(T.n||0)+1;let m="Mot de passe incorrect.";if(T.n>=5){T={n:0,u:Date.now()+9e5};m+=" Trop d’essais : accès bloqué pendant 15 minutes."}
+  try{localStorage.setItem(FUS_TRY,JSON.stringify(T))}catch(e){}
+  bad(m);inp.value="";inp.focus()},
+ pwdAsk(){
+  if(!FUS.ok)return;
+  modal('<h3 style="margin-top:0">Changer le mot de passe</h3><label>Nouveau mot de passe (4 caractères au moins)<input id="pw1" type="password" autocomplete="off" spellcheck="false"></label><label>Confirmer le nouveau mot de passe<input id="pw2" type="password" autocomplete="off" spellcheck="false"></label><p class="warn" id="pwerr" hidden></p><div class="ctl"><button class="bt" onclick="LG.pwdSave()">Enregistrer</button><button class="bt sec" onclick="LG.cancel()">Annuler</button></div>')},
+ pwdSave(){
+  const a=$("pw1").value,b=$("pw2").value,err=$("pwerr"),bad=m=>{err.textContent=m;err.hidden=false};
+  if(a.length<4)return bad("Le mot de passe doit contenir au moins 4 caractères.");
+  if(a===FUS_DEF)return bad("Choisissez un mot de passe différent du mot de passe par défaut.");
+  if(a!==b)return bad("Les deux saisies ne sont pas identiques.");
+  try{localStorage.setItem(FUS_PW,JSON.stringify({h:pwH(a)}))}catch(e){return bad("Le mot de passe n’a pas pu être enregistré.")}
+  closeModal();toast("Mot de passe modifié.")},
+ fusPick(inp){
+  if(!FUS.ok)return;
+  const fs=[...inp.files];inp.value="";if(!fs.length)return;
+  Promise.all(fs.map(f=>new Promise(ok=>{const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result),k=fusKind(d);if(!k)throw 0;ok({name:f.name,d:d,kind:k})}catch(e){ok({name:f.name,err:1})}};r.onerror=()=>ok({name:f.name,err:1});r.readAsText(f)}))).then(L=>{
+   const good=L.filter(x=>!x.err),bad=L.filter(x=>x.err);
+   if(!good.length){toast("Aucun fichier de sauvegarde valide.");return}
+   FUS.files=good;FUS.bad=bad;LG.fusPreview()})},
+ fusPreview(){
+  let rep;try{rep=fusRun(FUS.files,"garder",false)}catch(e){toast("La fusion a échoué : "+(e&&e.message||e));return}
+  const li=t=>'<li>'+t+'</li>',nul=!(rep.ecoles||rep.zeps||rep.filled||rep.conf);
+  const ex=rep.confs.slice(0,8).map(x=>li(esc(x))).join("")+(rep.conf>8?li("… et "+(rep.conf-8)+" autre(s)"):"");
+  modal('<h3 style="margin-top:0">Fusion des données</h3><ul>'+li("Fichiers lus : <b>"+rep.files+"</b>"+(FUS.bad.length?" (non valides, ignorés : "+FUS.bad.map(x=>esc(x.name)).join(", ")+")":""))+li("ZEP ajoutées : <b>"+rep.zeps+"</b>")+li("Écoles ajoutées : <b>"+rep.ecoles+"</b>")+li("Cases de données complétées : <b>"+rep.filled+"</b>")+li("Valeurs différentes (conflits) : <b>"+rep.conf+"</b>")+'</ul>'
+   +(nul?'<p class="mu">Rien de nouveau : ces fichiers ne contiennent pas de données absentes de votre application.</p>':'')
+   +(rep.conf?'<p><b>Si une même case a des valeurs différentes :</b></p><label style="display:block;font-weight:400"><input type="radio" name="fmode" value="garder" checked style="display:inline;width:auto;margin:0 8px 0 0">Garder mes valeurs (celles déjà saisies)</label><label style="display:block;font-weight:400"><input type="radio" name="fmode" value="fichier" style="display:inline;width:auto;margin:0 8px 0 0">Prendre les valeurs des fichiers</label><ul class="mu">'+ex+'</ul>':'')
+   +'<p class="mu">Les cases vides sont complétées avec les données des fichiers. Une sauvegarde de vos données actuelles est conservée : vous pourrez annuler la fusion depuis cette page.</p><div class="ctl"><button class="bt" '+(nul?'disabled ':'')+'onclick="LG.fusApply()">Appliquer la fusion</button><button class="bt sec" onclick="LG.fusCancel()">Annuler</button></div>')},
+ fusCancel(){FUS.files=null;closeModal()},
+ fusApply(){
+  if(!FUS.ok||!FUS.files)return;
+  const m=document.querySelector('input[name="fmode"]:checked'),mode=m?m.value:"garder",files=FUS.files;
+  try{localStorage.setItem(FUS_UNDO,JSON.stringify(backupObj()))}catch(e){if(!confirm("Impossible de conserver une sauvegarde avant fusion (espace insuffisant). Continuer quand même ?"))return}
+  try{const rep=fusRun(files,mode,true);FUS.files=null;closeModal();show("fusion");toast("Fusion appliquée : "+rep.filled+" case(s) complétée(s), "+rep.ecoles+" école(s) et "+rep.zeps+" ZEP ajoutée(s).")}
+  catch(e){toast("La fusion a échoué : "+(e&&e.message||e))}},
+ fusUndoAsk(){if(!FUS.ok)return;modal('<h3 style="margin-top:0">Annuler la dernière fusion</h3><p class="warn">Les données reviendront à l’état d’avant la dernière fusion. Les saisies faites depuis seront perdues.</p><div class="ctl"><button class="bt red" onclick="LG.fusUndo()">Annuler la fusion</button><button class="bt sec" onclick="LG.cancel()">Fermer</button></div>')},
+ fusUndo(){
+  closeModal();
+  try{const d=JSON.parse(localStorage.getItem(FUS_UNDO)||"null");if(!d||!d.master)throw new Error("aucune sauvegarde");
+   M=fix(d.master);M.ui.page="home";save();if(d.loco)wr(K_LOCO,d.loco);else localStorage.removeItem(K_LOCO);if(d.locoreb)wr(K_EB,d.locoreb);else localStorage.removeItem(K_EB);
+   localStorage.removeItem(FUS_UNDO);toast("Fusion annulée.");show("fusion")}
+  catch(e){toast("L’annulation a échoué : "+(e&&e.message||e))}}
+});
+
 window.addEventListener("message",e=>{const d=e.data;if(d&&d.loges==="goto"){M.ui.sub=d.sub||M.ui.sub;if(d.zep&&M.zeps.includes(d.zep))M.ui.rz=d.zep;M.ui.warn=null;save();show(d.page||"ident")}});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&$("ovl").classList.contains("on"))closeModal()});
 show(cur);
