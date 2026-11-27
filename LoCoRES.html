@@ -56,6 +56,16 @@
               var chd=decodeURI(String(gd.uri).replace(/^file:\/\//,''));
               return {chemin:chd,dossier:'Téléchargements',dossierChemin:chd.slice(0,chd.lastIndexOf('/')),uri:gd.uri,telechargement:true};
             }catch(e){repli=(repli?repli+' | ':'')+etape+' : '+msg(e)}
+            /* 1c) Android récent (stockage cloisonné) : dossier créé dans l'espace de l'application, toujours accessible en écriture */
+            try{
+              etape='écriture dans le dossier de l\u2019application';
+              var relE=dossier+'/'+name;
+              await delai(FS.writeFile({path:relE,data:b64,directory:'EXTERNAL',recursive:true}),20000,'écriture dans le dossier de l\u2019application');
+              var ge=await FS.getUri({path:relE,directory:'EXTERNAL'});
+              var che=decodeURI(String(ge.uri).replace(/^file:\/\//,''));
+              window.__dernierRepli=repli;
+              return {chemin:che,dossier:dossier,dossierChemin:che.slice(0,che.lastIndexOf('/')),uri:ge.uri};
+            }catch(e){repli=(repli?repli+' | ':'')+etape+' : '+msg(e)}
           }
           /* 2) Repli fiable : fichier temporaire + feuille de partage Android */
           if(!SH)throw new Error('plugin Share introuvable dans l\u2019APK');
