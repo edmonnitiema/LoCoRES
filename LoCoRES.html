@@ -635,7 +635,16 @@ const LG=window.LG={
  discBlur(w,el){const seen=new Set(),l=el.value.split(/\r?\n/).map(x=>x.trim()).filter(x=>{const k=nk(x);if(!x||seen.has(k))return false;seen.add(k);return true});if(w==="dc")M.discC[M.ui.dcg||"CP"]=l;else M.discE=l;save();el.value=l.join("\n")},
  copyDc(){const g=M.ui.dcg||"CP";["CP","CE","CM"].forEach(x=>{M.discC[x]=M.discC[x]===M.discC[g]?M.discC[x]:union(M.discC[x],M.discC[g])});save();toast("Disciplines copiées dans CP, CE et CM.")},
  backup(){download(new Blob([JSON.stringify(backupObj())],{type:"application/json"}),fileName());toast("Sauvegarde enregistrée : "+fileName())},
- async share(){const b=new Blob([JSON.stringify(backupObj())],{type:"application/json"});try{const f=new File([b],fileName(),{type:"application/json"});if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:"Sauvegarde LoCoRES"});return}}catch(e){if(e&&e.name==="AbortError")return}download(b,fileName());toast("Le partage n’est pas disponible ici : le fichier a été téléchargé.")},
+ async share(){const nom=fileName(),txt=JSON.stringify(backupObj()),b=new Blob([txt],{type:"application/json"});
+  /* 1) APK Android : feuille de partage native (WhatsApp, Bluetooth, e-mail…) */
+  try{if(window.Pont&&window.Pont.enregistrer){const b64=btoa(unescape(encodeURIComponent(txt)));await window.Pont.enregistrer(nom,"application/json",b64,null,"Envoyer la sauvegarde LoCoRES");return}}catch(e){}
+  /* 2) Navigateur : partage de fichier (certains navigateurs refusent le type JSON, on essaie aussi en texte) */
+  if(navigator.share&&navigator.canShare){
+   const essais=[[b,nom,"application/json"],[b,nom,"text/plain"],[b,nom+".txt","text/plain"]];
+   for(const e of essais){try{const f=new File([e[0]],e[1],{type:e[2]});if(navigator.canShare({files:[f]})){await navigator.share({files:[f],title:"Sauvegarde LoCoRES"});return}}catch(er){if(er&&er.name==="AbortError")return}}
+  }
+  /* 3) Repli : téléchargement du fichier */
+  download(b,nom);toast("Partage direct indisponible sur cet appareil : le fichier "+nom+" a été téléchargé. Envoyez-le depuis vos Téléchargements (WhatsApp, e-mail, Bluetooth…).")},
  pick(el){const f=el.files[0];el.value="";if(!f)return;const r=new FileReader();r.onload=()=>{let d;try{d=JSON.parse(r.result)}catch(e){return toast("Fichier invalide : ce n’est pas une sauvegarde.")}LG.analyse(d,f.name)};r.readAsText(f)},
  analyse(d,name){
   const cnt=(a)=>Array.isArray(a)?a.length:0;
